@@ -1,4 +1,4 @@
-# NVIDIA CUDA 13.0 + cuDNN 9 + Ubuntu 24.04をベースイメージとして使用
+# NVIDIA CUDA 13.0 + cuDNN + Ubuntu 24.04をベースイメージとして使用
 FROM nvidia/cuda:13.0.0-cudnn-devel-ubuntu24.04
 
 # 環境変数の設定
@@ -9,6 +9,7 @@ ENV USER_ID=1000
 ENV GROUP_ID=1000
 
 # 必要なパッケージのインストール
+# Ubuntu 24.04対応: libgl1-mesa-glxの代わりにlibgl1とlibglx-mesa0を使用
 RUN apt-get update && apt-get install -y \
     python3.12 \
     python3.12-venv \
@@ -16,13 +17,16 @@ RUN apt-get update && apt-get install -y \
     git \
     wget \
     curl \
-    libgl1-mesa-glx \
+    libgl1 \
+    libglx-mesa0 \
     libglib2.0-0 \
     libsm6 \
     libxext6 \
     libxrender-dev \
     libgomp1 \
     ffmpeg \
+    libgbm1 \
+    libegl1-mesa \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -31,7 +35,7 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
 
 # pipのアップグレード
-RUN python3 -m pip install --upgrade pip
+RUN python3 -m pip install --upgrade pip --break-system-packages
 
 # ComfyUIユーザーの作成
 RUN groupadd -g ${GROUP_ID} comfyui && \
@@ -65,16 +69,17 @@ RUN mkdir -p /app/ComfyUI/models/checkpoints \
     /app/ComfyUI/output \
     /app/ComfyUI/temp
 
-# PyTorchのインストール（CUDA 12.8対応）
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
+# PyTorchのインストール（CUDA 12.9 - 最新の安定版、CUDA 13.0と互換性あり）
+# CUDA 13.0は後方互換性があるため、12.9のPyTorchを使用
+RUN pip install --break-system-packages torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu129
 
 # ComfyUIの依存関係インストール
 WORKDIR /app/ComfyUI
-RUN pip install -r requirements.txt
+RUN pip install --break-system-packages -r requirements.txt
 
 # ComfyUI-Managerの依存関係インストール
 RUN if [ -f /app/ComfyUI/custom_nodes/ComfyUI-Manager/requirements.txt ]; then \
-    pip install -r /app/ComfyUI/custom_nodes/ComfyUI-Manager/requirements.txt; \
+    pip install --break-system-packages -r /app/ComfyUI/custom_nodes/ComfyUI-Manager/requirements.txt; \
     fi
 
 # 権限の設定
