@@ -14,8 +14,6 @@ ENV GROUP_ID=${GROUP_ID}
 
 # 必要なパッケージのインストール
 # Ubuntu 24.04対応: 旧パッケージ名から新パッケージ名への移行
-# libgl1-mesa-glx → libgl1 + libglx-mesa0
-# libegl1-mesa → libegl1
 RUN apt-get update && apt-get install -y \
     python3.12 \
     python3.12-venv \
@@ -33,6 +31,7 @@ RUN apt-get update && apt-get install -y \
     ffmpeg \
     libgbm1 \
     libegl1 \
+    sudo \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
@@ -40,12 +39,13 @@ RUN apt-get update && apt-get install -y \
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
 
-# pipの確認（Ubuntu 24.04のpip 24.0は十分新しいのでアップグレードは不要）
+# pipの確認
 RUN python3 -m pip --version
 
 # ComfyUIユーザーの作成（競合を回避する処理付き）
 RUN (getent group ${GROUP_ID} || groupadd -g ${GROUP_ID} comfyui) && \
-    (getent passwd ${USER_ID} || useradd -m -u ${USER_ID} -g ${GROUP_ID} -s /bin/bash comfyui)
+    (getent passwd ${USER_ID} || useradd -m -u ${USER_ID} -g ${GROUP_ID} -s /bin/bash comfyui) && \
+    echo "comfyui ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
 # 作業ディレクトリの設定
 WORKDIR /app
@@ -73,10 +73,11 @@ RUN mkdir -p /app/ComfyUI/models/checkpoints \
     /app/ComfyUI/models/text_encoders \
     /app/ComfyUI/input \
     /app/ComfyUI/output \
-    /app/ComfyUI/temp
+    /app/ComfyUI/temp \
+    /app/ComfyUI/user \
+    /app/ComfyUI/user/default
 
 # PyTorchのインストール（CUDA 12.9 - 最新の安定版、CUDA 13.0と互換性あり）
-# CUDA 13.0は後方互換性があるため、12.9のPyTorchを使用
 RUN pip install --break-system-packages torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu129
 
 # ComfyUIの依存関係インストール
@@ -88,8 +89,10 @@ RUN if [ -f /app/ComfyUI/custom_nodes/ComfyUI-Manager/requirements.txt ]; then \
     pip install --break-system-packages -r /app/ComfyUI/custom_nodes/ComfyUI-Manager/requirements.txt; \
     fi
 
-# 権限の設定（UID/GIDを使用）
-RUN chown -R ${USER_ID}:${GROUP_ID} /app
+# 権限の設定（UID/GIDを使用）- すべてのディレクトリに適用
+RUN chown -R ${USER_ID}:${GROUP_ID} /app && \
+    chmod -R 755 /app/ComfyUI && \
+    chmod -R 777 /app/ComfyUI/user /app/ComfyUI/output /app/ComfyUI/input /app/ComfyUI/temp
 
 # ユーザーを切り替え（UID指定）
 USER ${USER_ID}
@@ -97,8 +100,26 @@ USER ${USER_ID}
 # ポートの公開
 EXPOSE 8188
 
-# 起動スクリプトの作成
+# 起動スクリプトの作成（権限設定を含む）
 RUN echo '#!/bin/bash\n\
+# ボリュームマウントされたディレクトリの権限を修正\n\
+if [ -d "/app/ComfyUI/user" ]; then\n\
+    sudo chown -R ${USER_ID}:${GROUP_ID} /app/ComfyUI/user 2>/dev/null || true\n\
+fi\n\
+if [ -d "/app/ComfyUI/output" ]; then\n\
+    sudo chown -R ${USER_ID}:${GROUP_ID} /app/ComfyUI/output 2>/dev/null || true\n\
+fi\n\
+if [ -d "/app/ComfyUI/input" ]; then\n\
+    sudo chown -R ${USER_ID}:${GROUP_ID} /app/ComfyUI/input 2>/dev/null || true\n\
+fi\n\
+if [ -d "/app/ComfyUI/temp" ]; then\n\
+    sudo chown -R ${USER_ID}:${GROUP_ID} /app/ComfyUI/temp 2>/dev/null || true\n\
+fi\n\
+if [ -d "/app/ComfyUI/custom_nodes" ]; then\n\
+    sudo chown -R ${USER_ID}:${GROUP_ID} /app/ComfyUI/custom_nodes 2>/dev/null || true\n\
+fi\n\
+\n\
+# ComfyUIを起動\n\
 python3 /app/ComfyUI/main.py --listen 0.0.0.0 --port ${COMFYUI_PORT}' > /app/start.sh \
     && chmod +x /app/start.sh
 
