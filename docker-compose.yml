@@ -1,0 +1,84 @@
+services:
+  comfyui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        USER_ID: ${USER_ID:-1000}
+        GROUP_ID: ${GROUP_ID:-1000}
+    image: comfyui:latest
+    container_name: comfyui
+    restart: unless-stopped
+    
+    # NVIDIA GPUサポート
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    
+    # 環境変数
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility
+      - COMFYUI_PORT=8188
+      - PYTHONUNBUFFERED=1
+      - USER_ID=${USER_ID:-1000}
+      - GROUP_ID=${GROUP_ID:-1000}
+    
+    # ポートマッピング
+    ports:
+      - "8188:8188"
+    
+    # ボリュームマウント（永続化）
+    volumes:
+      # モデルファイル（チェックポイント、VAE、LoRA等）
+      - /srv/ai-models/comfyui/checkpoints:/app/ComfyU/srv/ai-models/comfyui/checkpoints
+      - /srv/ai-models/comfyui/vae:/app/ComfyU/srv/ai-models/comfyui/vae
+      - /srv/ai-models/comfyui/loras:/app/ComfyU/srv/ai-models/comfyui/loras
+      - /srv/ai-models/comfyui/embeddings:/app/ComfyU/srv/ai-models/comfyui/embeddings
+      - /srv/ai-models/comfyui/controlnet:/app/ComfyU/srv/ai-models/comfyui/controlnet
+      - /srv/ai-models/comfyui/clip:/app/ComfyU/srv/ai-models/comfyui/clip
+      - /srv/ai-models/comfyui/clip_vision:/app/ComfyU/srv/ai-models/comfyui/clip_vision
+      - /srv/ai-models/comfyui/style_models:/app/ComfyU/srv/ai-models/comfyui/style_models
+      - /srv/ai-models/comfyui/diffusion_models:/app/ComfyU/srv/ai-models/comfyui/diffusion_models
+      - /srv/ai-models/comfyui/gligen:/app/ComfyU/srv/ai-models/comfyui/gligen
+      - /srv/ai-models/comfyui/upscale_models:/app/ComfyU/srv/ai-models/comfyui/upscale_models
+      - /srv/ai-models/comfyui/hypernetworks:/app/ComfyU/srv/ai-models/comfyui/hypernetworks
+      - /srv/ai-models/comfyui/vae_approx:/app/ComfyU/srv/ai-models/comfyui/vae_approx
+      - /srv/ai-models/comfyui/text_encoders:/app/ComfyU/srv/ai-models/comfyui/text_encoders
+      
+      # カスタムノード
+      - /srv/comfyui/custom_nodes:/app/ComfyUI/custom_nodes
+      
+      # 入出力フォルダ
+      - /srv/comfyui/input:/app/ComfyUI/input
+      - /srv/comfyui/output:/app/ComfyUI/output
+      - /srv/comfyui/temp:/app/ComfyUI/temp
+      
+      # ワークフロー保存用
+      - /srv/comfyui/user:/app/ComfyUI/user
+    
+    # ネットワーク設定
+    networks:
+      - comfyui-network
+    
+    # ヘルスチェック
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8188"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+networks:
+  comfyui-network:
+    driver: bridge
+
+# オプション: 追加のボリューム定義（名前付きボリュームを使用する場合）
+volumes:
+  models_data:
+  custom_nodes_data:
+  output_data:
