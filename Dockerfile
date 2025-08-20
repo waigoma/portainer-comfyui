@@ -9,7 +9,9 @@ ENV USER_ID=1000
 ENV GROUP_ID=1000
 
 # 必要なパッケージのインストール
-# Ubuntu 24.04対応: libgl1-mesa-glxの代わりにlibgl1とlibglx-mesa0を使用
+# Ubuntu 24.04対応: 旧パッケージ名から新パッケージ名への移行
+# libgl1-mesa-glx → libgl1 + libglx-mesa0
+# libegl1-mesa → libegl1
 RUN apt-get update && apt-get install -y \
     python3.12 \
     python3.12-venv \
@@ -26,7 +28,7 @@ RUN apt-get update && apt-get install -y \
     libgomp1 \
     ffmpeg \
     libgbm1 \
-    libegl1-mesa \
+    libegl1 \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
