@@ -1,12 +1,16 @@
 # NVIDIA CUDA 13.0 + cuDNN + Ubuntu 24.04をベースイメージとして使用
 FROM nvidia/cuda:13.0.0-cudnn-devel-ubuntu24.04
 
+# ビルド引数の定義（デフォルト値を9001に設定して競合を避ける）
+ARG USER_ID=9001
+ARG GROUP_ID=9001
+
 # 環境変数の設定
 ENV DEBIAN_FRONTEND=noninteractive
 ENV PYTHONUNBUFFERED=1
 ENV COMFYUI_PORT=8188
-ENV USER_ID=1000
-ENV GROUP_ID=1000
+ENV USER_ID=${USER_ID}
+ENV GROUP_ID=${GROUP_ID}
 
 # 必要なパッケージのインストール
 # Ubuntu 24.04対応: 旧パッケージ名から新パッケージ名への移行
@@ -37,12 +41,11 @@ RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
 
 # pipの確認（Ubuntu 24.04のpip 24.0は十分新しいのでアップグレードは不要）
-# 必要に応じて特定のパッケージ管理ツールをインストール
 RUN python3 -m pip --version
 
-# ComfyUIユーザーの作成
-RUN groupadd -g ${GROUP_ID} comfyui && \
-    useradd -m -u ${USER_ID} -g comfyui -s /bin/bash comfyui
+# ComfyUIユーザーの作成（競合を回避する処理付き）
+RUN (getent group ${GROUP_ID} || groupadd -g ${GROUP_ID} comfyui) && \
+    (getent passwd ${USER_ID} || useradd -m -u ${USER_ID} -g ${GROUP_ID} -s /bin/bash comfyui)
 
 # 作業ディレクトリの設定
 WORKDIR /app
@@ -85,11 +88,11 @@ RUN if [ -f /app/ComfyUI/custom_nodes/ComfyUI-Manager/requirements.txt ]; then \
     pip install --break-system-packages -r /app/ComfyUI/custom_nodes/ComfyUI-Manager/requirements.txt; \
     fi
 
-# 権限の設定
-RUN chown -R comfyui:comfyui /app
+# 権限の設定（UID/GIDを使用）
+RUN chown -R ${USER_ID}:${GROUP_ID} /app
 
-# ユーザーを切り替え
-USER comfyui
+# ユーザーを切り替え（UID指定）
+USER ${USER_ID}
 
 # ポートの公開
 EXPOSE 8188

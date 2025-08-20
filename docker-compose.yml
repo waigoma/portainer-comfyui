@@ -4,8 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        USER_ID: ${USER_ID:-1000}
-        GROUP_ID: ${GROUP_ID:-1000}
+        USER_ID: ${USER_ID:-9001}
+        GROUP_ID: ${GROUP_ID:-9001}
     image: comfyui:latest
     container_name: comfyui
     restart: unless-stopped
