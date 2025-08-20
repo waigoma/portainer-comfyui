@@ -36,8 +36,9 @@ RUN apt-get update && apt-get install -y \
 RUN update-alternatives --install /usr/bin/python3 python3 /usr/bin/python3.12 1 \
     && update-alternatives --install /usr/bin/python python /usr/bin/python3.12 1
 
-# pipのアップグレード
-RUN python3 -m pip install --upgrade pip --break-system-packages
+# pipの確認（Ubuntu 24.04のpip 24.0は十分新しいのでアップグレードは不要）
+# 必要に応じて特定のパッケージ管理ツールをインストール
+RUN python3 -m pip --version
 
 # ComfyUIユーザーの作成
 RUN groupadd -g ${GROUP_ID} comfyui && \
